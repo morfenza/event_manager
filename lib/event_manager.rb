@@ -8,6 +8,16 @@ def clean_zipcode(zipcode)
   zipcode.to_s.rjust(5, '0')[0..4]
 end
 
+def clean_phone_number(phone_number)
+  phone_number = phone_number.scan(/\d/).join
+
+  return phone_number if phone_number.size == 10
+
+  return phone_number[1..10] if phone_number.size == 11 && phone_number[0] == 1
+
+  'Invalid phone number'
+end
+
 # rubocop:disable Metrics/MethodLength
 def legislators_by_zipcode(zipcode)
   civic_info = Google::Apis::CivicinfoV2::CivicInfoService.new
@@ -49,10 +59,13 @@ contents = CSV.open(
 contents.each do |row|
   id = row[0]
   name = row[:first_name]
+  phone_number = clean_phone_number(row[:homephone])
 
   zipcode = clean_zipcode(row[:zipcode])
   legislators = legislators_by_zipcode(zipcode)
 
   form_letter = erb_template.result(binding)
   save_thank_you_letter(id, form_letter)
+
+  puts "#{id} | #{name} | #{phone_number} |-> Letter saved"
 end
