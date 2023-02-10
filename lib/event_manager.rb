@@ -3,6 +3,8 @@
 require 'csv'
 require 'google/apis/civicinfo_v2'
 require 'erb'
+require 'time'
+require 'date'
 
 def clean_zipcode(zipcode)
   zipcode.to_s.rjust(5, '0')[0..4]
@@ -45,6 +47,36 @@ def save_thank_you_letter(id, form_letter)
   end
 end
 
+def date_time_targetting(date_time, time_hash, weekday_hash)
+  date = Date.strptime(date_time[0], '%m/%d/%y')
+  time = Time.parse(date_time[1])
+
+  time_hash[time.hour] += 1
+  weekday_hash[date.wday] += 1
+end
+
+# rubocop:disable Metrics/MethodLength
+def print_max_date_time(time_hash, weekday_hash)
+  date = weekday_hash.select { |_k, v| v == weekday_hash.values.max }.keys
+  time = time_hash.select { |_k, v| v == time_hash.values.max }.keys.join(', ')
+
+  weekday = {
+    0 => 'Sunday',
+    1 => 'Monday',
+    2 => 'Tuesday',
+    3 => 'Wednesday',
+    4 => 'Thursday',
+    5 => 'Friday',
+    6 => 'Saturday'
+  }
+
+  date = date.map { |day| weekday[day] }.join(', ')
+
+  puts "The hour(s) where most people registered: #{time}"
+  puts "The weekday(s) where most people registered: #{date}"
+end
+# rubocop:enable Metrics/MethodLength
+
 puts 'Event Manager Initialized'
 
 template_letter = File.read('form_letter.erb')
@@ -55,6 +87,9 @@ contents = CSV.open(
   headers: true,
   header_converters: :symbol
 )
+
+time_hash = Hash.new(0)
+weekday_hash = Hash.new(0)
 
 contents.each do |row|
   id = row[0]
@@ -67,5 +102,10 @@ contents.each do |row|
   form_letter = erb_template.result(binding)
   save_thank_you_letter(id, form_letter)
 
+  date_time_targetting(row[:regdate].split(' '), time_hash, weekday_hash)
+
   puts "#{id} | #{name} | #{phone_number} |-> Letter saved"
 end
+
+puts
+print_max_date_time(time_hash, weekday_hash)
